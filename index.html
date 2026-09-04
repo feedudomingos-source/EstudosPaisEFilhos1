@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Simulado Interativo e Mapas Mentais</title>
+  <style>
+    :root {
+      --primary-color: #4A90E2;
+      --secondary-color: #f4f7f6;
+      --correct-color: #2ecc71;
+      --wrong-color: #e74c3c;
+      --text-color: #2c3e50;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: var(--secondary-color);
+      color: var(--text-color);
+      margin: 0;
+      padding: 20px;
+      display: flex;
+      justify-content: center;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 800px;
+      background: white;
+      padding: 25px;
+      border-radius: 12px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    }
+
+    h1, h2 {
+      text-align: center;
+      color: var(--primary-color);
+    }
+
+    .tabs {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    .tab-btn {
+      flex: 1;
+      padding: 12px;
+      border: none;
+      background: #e0e0e0;
+      border-radius: 8px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+
+    .tab-btn.active {
+      background: var(--primary-color);
+      color: white;
+    }
+
+    .content-section {
+      display: none;
+    }
+
+    .content-section.active {
+      display: block;
+    }
+
+    /* Estilos do Quiz */
+    .question-card {
+      background: #f9f9f9;
+      padding: 15px;
+      margin-bottom: 20px;
+      border-left: 5px solid var(--primary-color);
+      border-radius: 6px;
+    }
+
+    .options-list {
+      list-style: none;
+      padding: 0;
+    }
+
+    .option-item {
+      margin: 8px 0;
+      padding: 10px 15px;
+      background: white;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .option-item:hover {
+      background: #eef5fc;
+    }
+
+    .option-item.correct {
+      background: var(--correct-color);
+      color: white;
+      border-color: var(--correct-color);
+    }
+
+    .option-item.wrong {
+      background: var(--wrong-color);
+      color: white;
+      border-color: var(--wrong-color);
+    }
+
+    .explanation {
+      margin-top: 10px;
+      padding: 10px;
+      background: #eaf2f8;
+      border-radius: 6px;
+      font-size: 0.9em;
+      display: none;
+    }
+
+    /* Estilos do PDF */
+    .pdf-viewer {
+      width: 100%;
+      height: 500px;
+      border: none;
+      border-radius: 8px;
+      margin-top: 15px;
+    }
+
+    textarea {
+      width: 100%;
+      height: 80px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      padding: 8px;
+      box-sizing: border-box;
+    }
+
+    .btn-check {
+      background: var(--primary-color);
+      color: white;
+      border: none;
+      padding: 8px 15px;
+      border-radius: 6px;
+      cursor: pointer;
+      margin-top: 8px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <h1>Estudos e Simulados</h1>
+    
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchTab('simulado')">📝 Simulado</button>
+      <button class="tab-btn" onclick="switchTab('mapa')">🧠 Mapa Mental</button>
+    </div>
+
+    <div id="simulado" class="content-section active">
+      <div id="questions-container">
+        <p>Carregando questões do Firebase...</p>
+      </div>
+    </div>
+
+    <div id="mapa" class="content-section">
+      <h2>Mapa Mental da Matéria</h2>
+      <p>Abaixo você pode consultar o resumo em PDF gerado para esta avaliação:</p>
+      <iframe id="pdf-frame" class="pdf-viewer" src=""></iframe>
+    </div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyA1xZitrDXALQI65t7pW0KxpQId6kqkJhM",
+      authDomain: "estudopaisefilhos.firebaseapp.com",
+      projectId: "estudopaisefilhos",
+      storageBucket: "estudopaisefilhos.firebasestorage.app",
+      messagingSenderId: "758676353564",
+      appId: "1:758676353564:web:3c97fd32d0d8a8e3c5a5d9",
+      measurementId: "G-54207CCS57"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    async function loadQuestions() {
+      const container = document.getElementById('questions-container');
+      try {
+        const querySnapshot = await getDocs(collection(db, "questoes"));
+        
+        if (querySnapshot.empty) {
+          container.innerHTML = "<p>Nenhuma questão encontrada na coleção 'questoes'.</p>";
+          return;
+        }
+
+        container.innerHTML = "";
+
+        querySnapshot.forEach((doc, index) => {
+          const q = doc.data();
+          const qElement = document.createElement('div');
+          qElement.className = 'question-card';
+
+          if (q.tipo === "multipla_escolha") {
+            qElement.innerHTML = `
+              <h3>${index + 1}. ${q.enunciado}</h3>
+              <ul class="options-list">
+                ${q.opcoes.map((opt, i) => `
+                  <li class="option-item" onclick="checkAnswer(this, ${i === q.corretaIndex})">
+                    ${opt}
+                  </li>
+                `).join('')}
+              </ul>
+              <div class="explanation"><strong>Explicação:</strong> ${q.explicacao || 'Sem explicação disponível.'}</div>
+            `;
+          } else if (q.tipo === "dissertativa") {
+            qElement.innerHTML = `
+              <h3>${index + 1}. ${q.enunciado}</h3>
+              <textarea placeholder="Escreva sua resposta aqui..."></textarea>
+              <button class="btn-check" onclick="toggleExplanation(this)">Ver Gabarito</button>
+              <div class="explanation"><strong>Gabarito Sugerido:</strong> ${q.explicacao || 'Sem gabarito disponível.'}</div>
+            `;
+          }
+
+          container.appendChild(qElement);
+        });
+      } catch (error) {
+        container.innerHTML = `<p>Erro ao carregar dados: ${error.message}</p>`;
+      }
+    }
+
+    function loadPdf() {
+      document.getElementById('pdf-frame').src = './mapa1.pdf';
+    }
+
+    // Exposição das funções interativas para o escopo global (window)
+    window.switchTab = function(tabName) {
+      document.querySelectorAll('.content-section').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+      
+      document.getElementById(tabName).classList.add('active');
+      event.currentTarget.classList.add('active');
+    };
+
+    window.checkAnswer = function(element, isCorrect) {
+      const parent = element.parentElement;
+      const explanationDiv = parent.nextElementSibling;
+      
+      if (parent.classList.contains('answered')) return;
+      parent.classList.add('answered');
+
+      if (isCorrect) {
+        element.classList.add('correct');
+      } else {
+        element.classList.add('wrong');
+      }
+
+      explanationDiv.style.display = 'block';
+    };
+
+    window.toggleExplanation = function(button) {
+      const explanationDiv = button.nextElementSibling;
+      if (explanationDiv.style.display === 'block') {
+        explanationDiv.style.display = 'none';
+        button.innerText = 'Ver Gabarito';
+      } else {
+        explanationDiv.style.display = 'block';
+        button.innerText = 'Ocultar Gabarito';
+      }
+    };
+
+    // Inicialização
+    loadQuestions();
+    loadPdf();
+  </script>
+</body>
+</html>
